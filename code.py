@@ -55,14 +55,13 @@ from sklearn.metrics import classification_report
 
 
 # 1-3. 데이터 불러오기
-root_dir = os.getcwd()
+root_dir = os.getcwd() # 현재 작업 디렉토리
 f_lists = os.listdir(root_dir)
 print("File Lists : ", f_lists)
 
 
 new_file_lists = [f for f in f_lists if f.endswith('.csv')]
 print("File Lists : ", new_file_lists)
-
 
 
 data_lists = new_file_lists[:-1]
@@ -84,9 +83,12 @@ def csv_read_(data_dir, data_list):
     return tmp
 
 
-dd = csv_read_(root_dir, data_lists[0])
+# dd = csv_read_(root_dir, data_lists[0]) # 가이드북 코드하면 실행안돼. 내 생각엔 파씽에 적합하지 않은 형태
 
-for i in range(1, len(data_lists)):
+# 수정본
+dd = csv_read_(root_dir, data_lists[1])
+
+for i in range(2, len(data_lists)):
     dd = pd.merge(dd, csv_read_(root_dir, data_lists[i]), how='outer')
 dd
 
@@ -126,7 +128,11 @@ dedicated_data.isna().sum()
 dedicated_data.hist(figsize=(10,10))
 
 # 2-8. 데이터 상관관계 분석
-correlation = dedicated_data.corr()
+# correlation = dedicated_data.corr() # 실행안돼. 수정
+
+# 수정ver
+correlation = dedicated_data.drop('DTime', axis=1).corr()
+
 correlation
 
 # 2-9. 데이터 상관관계 시각화
@@ -173,10 +179,31 @@ print("Unique Date List : ", d_error_lists)
 
 
 # 5-5. Train/Test Data Set Make
-X_data = pd.DataFrame(columns={'pH','Temp','Current', 'Voltage', 'QC'})
+# X_data = pd.DataFrame(columns={'pH','Temp','Current', 'Voltage', 'QC'}) # 이것도 가이드북 오류인듯
+
+# 수정ver
+X_data = pd.DataFrame(columns=['pH', 'Temp', 'Current', 'Voltage', 'QC'])
 
 
-
+# =============================================================================
+# 
+# for d in d_lists:
+#     for lot in lot_lists:
+#         tmp = dd[(dd['DTime']==d)&(dd['Lot']==lot)]
+#         tmp = tmp[['pH', 'Temp','Current', 'Voltage']]
+#         error_df = error_drop[(error_drop['Date']==d)&((error_drop['LoT']==lot))]
+#         len_error = len(error_df)
+#         
+#         if len_error>0:
+#             trr = np.full((tmp['pH'].shape), 0)
+#         else:
+#             trr = np.full((tmp['pH'].shape), 1)
+#         tmp['QC'] = trr
+#         X_data = X_data.append(tmp)
+# =============================================================================
+    
+# pandas의 append()는 버전 2.0.0 이후부터 사라진 기능임.
+# 
 for d in d_lists:
     for lot in lot_lists:
         tmp = dd[(dd['DTime']==d)&(dd['Lot']==lot)]
@@ -184,12 +211,15 @@ for d in d_lists:
         error_df = error_drop[(error_drop['Date']==d)&((error_drop['LoT']==lot))]
         len_error = len(error_df)
         
-        if len_error>0:
+        if len_error > 0:
             trr = np.full((tmp['pH'].shape), 0)
         else:
-        trr = np.full((tmp['pH'].shape), 1)
-    tmp['QC'] = trr
-    X_data = X_data.append(tmp)
+            trr = np.full((tmp['pH'].shape), 1)
+        tmp['QC'] = trr
+        X_data = pd.concat([X_data, tmp], ignore_index=True)
+
+
+
 X_data=X_data.apply(pd.to_numeric)
 
 
@@ -202,11 +232,11 @@ train_data.corr()
 
 fig, ax = plt.subplots(figsize=(7,7))
 sns.heatmap(train_data.corr(),
- cmap='RdYlBu_r',
- annot = True,
- linewidths=0.5,
- cbar_kws={"shrink":.5},
- vmin=-1, vmax=1)
+    cmap='RdYlBu_r',
+    annot = True,
+    linewidths=0.5,
+    cbar_kws={"shrink":.5},
+    vmin=-1, vmax=1)
 plt.show()
 
 
@@ -214,30 +244,71 @@ test_data.describe()
 
 test_data.corr()
 
+
+
 fig, ax = plt.subplots(figsize=(7,7))
 
 sns.heatmap(test_data.corr(),
- cmap='RdYlBu_r',
- annot = True,
- linewidths=0.5,
- cbar_kws={"shrink":.5},
- vmin=-1, vmax=1)
+    cmap='RdYlBu_r',
+    annot = True,
+    linewidths=0.5,
+    cbar_kws={"shrink":.5},
+    vmin=-1, vmax=1)
 plt.show()
+
+
+
+
+
 
 
 # 6. 모델링
 # 6-1. Regression 모델 모델링
-is_training = True
+
+is_training = True  # 현재 모드가 모델 훈련 모드임을 나타냄
 if is_training:
-    reg = ak.StructuredDataRegressor( overwrite=True, max_trials=5)
+    # reg = ak.StructuredDataRegressor(overwrite=True, max_trials=5) # 이 부분이 계속해서 오류 발생. 디렉토리 문제인 것 같은데, 명시적으로 설정해줘도 계속 문제 발생.
+    reg = ak.StructuredDataRegressor(overwrite=True, max_trials=5, directory=model_dir)
+
     reg.fit(train_data[['pH','Temp','Current', 'Voltage']], train_data[['QC']], verbose=2, epochs=7)
     model = reg.export_model()
 else:
     model = tensorflow.keras.models.load_model("structured_data_regressor/best_model", custom_objects=ak.CUSTOM_OBJECTS)
 
 
+
+
+# =============================================================================
+# 모델 훈련:
+# 
+# is_training이 True인 경우, StructuredDataRegressor를 사용하여 구조화된 데이터에 대한 회귀 모델을 생성합니다.
+# 여기서 overwrite=True는 이전에 저장된 모델이나 트라이얼(trial)이 있다면 덮어쓰겠다는 의미이며, max_trials=5는 최대 5번의 시도를 통해 최적의 모델을 찾겠다는 것을 의미합니다.
+# reg.fit 메서드를 호출하여 모델을 훈련시킵니다. 이때, train_data에서 독립 변수로 사용될 'pH', 'Temp', 'Current', 'Voltage' 열을 입력 데이터로, 종속 변수 'QC'를 타겟 데이터로 사용합니다.
+# verbose=2는 훈련 과정에서의 로그 출력 수준을 설정하고, epochs=7은 전체 데이터셋을 7회 반복 학습하겠다는 것을 의미합니다.
+# reg.export_model() 메서드를 호출하여 훈련된 모델을 내보냅니다.
+# 이렇게 내보낸 모델은 TensorFlow의 Keras 모델 객체로, 추가 분석이나 예측, 저장 등에 사용할 수 있습니다.
+# 모델 로드:
+# 
+# is_training이 False인 경우, 즉 모델 훈련 모드가 아닐 때는 tensorflow.keras.models.load_model 메서드를 사용하여 사전에 저장된 모델을 로드합니다. 여기서 "structured_data_regressor/best_model"은 저장된 모델의 경로와 파일명을 나타냅니다. custom_objects=ak.CUSTOM_OBJECTS는 AutoKeras에서 정의된 사용자 정의 객체들을 로드하는 데 필요한 매개변수입니다. 이는 AutoKeras가 훈련 과정에서 사용할 수 있는 특정 사용자 정의 층이나 함수 등을 포함할 수 있기 때문에 필요합니다.
+# 이 코드는 AutoKeras를 사용하여 구조화된 데이터에 대한 회귀 문제를 해결하는 전체적인 과정을 보여줍니다. 모델 훈련과 로드를 조건에 따라 분기 처리하여, 훈련 모드와 평가/예측 모드를 구분합니다.
+# 
+# =============================================================================
+
+
+
+
+
+
+
+
 # 6-2. DecisionTree 모델 모델링
 clf = tree.DecisionTreeRegressor()
+
+
+
+
+
+
 
 
 # 7. 모델훈련
@@ -252,7 +323,7 @@ plot_model(model)
 
 
 # 7-3. Decision Tree 모델 학습
-clf = clf.fit(X_data[['pH','Temp','Current', ‘Voltage’]], X_data[['QC']])
+clf = clf.fit(X_data[['pH','Temp','Current', 'Voltage']], X_data[['QC']])
 
 
 # 7-4. Decision Tree 모델 시각화
@@ -269,7 +340,7 @@ if vis:
 
 # 8-2. Decision Tree 모델 튜닝
 new_clf = tree.DecisionTreeRegressor(max_depth=3)
-new_clf = new_clf.fit(train_data[['pH','Temp','Current', ‘Voltage’]], train_data[['QC']])
+new_clf = new_clf.fit(train_data[['pH','Temp','Current', 'Voltage']], train_data[['QC']])
 
 plt.figure(figsize=(10,10))
 tree.plot_tree(new_clf)
