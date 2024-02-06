@@ -1,13 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Feb  7 00:24:26 2024
-
-@author: BTG
-"""
-
 # =============================================================================
 # Author : 배태겸
-# 
+# Date : 2024.02.07
 # Subject : 품질 이상탐지/진단(도금욕) AI 데이터셋
 # =============================================================================
 
@@ -72,7 +65,7 @@ print("Error Data List : ", error_list)
 
 def csv_read_(data_dir, data_list):
     tmp = pd.read_csv(os.path.join(data_dir, data_list), sep=',', encoding='utf-8')
-    y, m, d = map(int, data_list.split('-')[-1].split('.')[:-1])
+    y, m, d = map(int, data_list.split('-')[-1].split('.')[:-1]) # 파일 이름에서 날짜 정보를 추출. 파일 이름이 'yyyy-mm-dd.csv' 형태라고 가정할 때, 이 구문은 파일 이름을 먼저 '-'로 분리한 후, 마지막 요소([-1])인 'dd.csv'를 다시 '.'으로 분리하여 'dd' 부분만 추출한 다음, 연(y), 월(m), 일(d)을 정수로 변환
     time = tmp['Time']
     tmp['DTime'] ='-'.join(data_list.split('-')[-1].split('.')[:-1])
     ctime = time.apply(lambda _ : _.replace(u'오후', 'PM').replace(u'오전', 'AM'))
@@ -81,6 +74,8 @@ def csv_read_(data_dir, data_list):
     tmp['Time'] = newtime
     
     return tmp
+
+
 
 
 # dd = csv_read_(root_dir, data_lists[0]) # 가이드북 코드하면 실행안돼. 내 생각엔 파씽에 적합하지 않은 형태
